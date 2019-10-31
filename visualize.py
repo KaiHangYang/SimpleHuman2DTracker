@@ -32,7 +32,7 @@ def VisualRelation(leg_relations, color_table):
 
 if __name__ == "__main__":
   label_path = "./dataset/annotations/train_fu_labeled.json"
-  img_dir = "dataset/images"
+  img_dir = "./dataset/images"
 
   datas = json.load(open(label_path))
   img_dict = {}
@@ -40,8 +40,8 @@ if __name__ == "__main__":
     img_dict[cur_img["id"]] = cur_img["file_name"]
 
   for cur_data in datas["annotations"]:
-    print(os.path.join(img_dict[cur_data["image_id"]]))
-    img = cv2.imread(os.path.join(img_dict[cur_data["image_id"]]))
+
+    img = cv2.imread(os.path.join(img_dir, img_dict[cur_data["image_id"]]))
     j2ds = np.array(cur_data["keypoints"])
     rels = np.array(cur_data["rel"])
     bbox = np.array(cur_data["bbox"])

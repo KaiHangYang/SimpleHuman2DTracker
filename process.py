@@ -136,7 +136,7 @@ if __name__ == "__main__":
                                 int(lbl["shapes"][2]["label"]),
                                 int(lbl["shapes"][3]["label"])]).astype(np.int)
       leg_relations = np.array([-1, 1, 2, 0])[leg_relations]
-      label_relations = np.zeros([13])
+      label_relations = np.zeros([11])
       label_relations[0:4] = leg_relations
 
       j2ds, bbox, believes = interpreter.Detect(img, idx == 0)
