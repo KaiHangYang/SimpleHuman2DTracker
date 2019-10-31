@@ -102,37 +102,86 @@ def VisualRelation(leg_relations, color_table):
     color_table[J13_ANKLE_L] = [0, 0, 0]
 
   return color_table
+
+
 if __name__ == "__main__":
   interpreter = Interpreter()
+  processed_data = dict(annotations=[], images=[])
 
-  for v_idx in range(15, 20):
+  cur_img_id = 0
+  cur_lbl_id = 0
+  lbl_img_path = "train/fu_labeled"
+  save_img_path = os.path.join("./dataset/images", lbl_img_path)
+  save_lbl_path = os.path.join("./dataset/annotations", "train_fu_labeled.json")
+  if not os.path.isdir(save_img_path):
+    os.makedirs(save_img_path)
+
+  if not os.path.isdir(os.path.dirname(save_lbl_path)):
+    os.makedirs(os.path.dirname(save_lbl_path))
+
+  for v_idx in range(0, 20):
     data_dir = "E:/DataSets/relation/image/{:02d}".format(v_idx + 1)
     data_list = GetImageLists(data_dir)
 
     for idx, cur_data in enumerate(data_list):
+      sys.stderr.write("\rCurrently processing: {:05d}".format(cur_lbl_id))
+      sys.stderr.flush()
+
       img = cv2.imread(os.path.join(data_dir, cur_data[0]))
-      print(os.path.join(data_dir, cur_data[0]))
+
+      # Read labeled relations.
       lbl = json.load(open(os.path.join(data_dir, cur_data[1])))
       leg_relations = np.array([int(lbl["shapes"][0]["label"]),
                                 int(lbl["shapes"][1]["label"]),
                                 int(lbl["shapes"][2]["label"]),
                                 int(lbl["shapes"][3]["label"])]).astype(np.int)
       leg_relations = np.array([-1, 1, 2, 0])[leg_relations]
+      label_relations = np.zeros([13])
+      label_relations[0:4] = leg_relations
 
       j2ds, bbox, believes = interpreter.Detect(img, idx == 0)
       color_table = (np.ones([13, 3]) * 128).astype(np.uint8)
+      color_table = VisualRelation(label_relations, color_table)
 
-      color_table = VisualRelation(leg_relations, color_table)
-      
-      display_img = display_utils.drawPoints(img, j2ds, point_ratio=10, color_table=color_table)
-      # bbox_joints = np.array([[bbox[0], bbox[1]],
-      #                         [bbox[0] + bbox[2], bbox[1]],
-      #                         [bbox[0] + bbox[2], bbox[1] + bbox[3]],
-      #                         [bbox[0], bbox[1] + bbox[3]]]).astype(np.int)
+      extra_pad = max(bbox[2], bbox[3]) * 0.3
+      bbox_pad = max(bbox[2], bbox[3]) * 0.125
+
+      affine_matrix = np.array([[1.0, 0.0, -(bbox[0] - extra_pad)], [0.0, 1.0, -(bbox[1] - extra_pad)]])
+      label_img = cv2.warpAffine(img, affine_matrix, dsize=(int(bbox[2] + 2*extra_pad), int(bbox[3] + 2*extra_pad)))
+      label_img_name = os.path.join(save_img_path, cur_data[0])
+
+      label_j2ds = j2ds - np.array([bbox[0], bbox[1]]) + np.array([extra_pad, extra_pad])
+      label_bbox = np.array([0, 0, bbox[2] + 2*extra_pad, bbox[3] + 2*extra_pad])
+      label_bbox = np.array([bbox_pad, bbox_pad,
+                             label_bbox[2] - 2*bbox_pad, label_bbox[3] - 2*bbox_pad])
+
+      processed_data["annotations"].append({
+        "id": cur_lbl_id,
+        "image_id": cur_img_id,
+        "keypoints": np.concatenate([label_j2ds, np.ones([13, 1])], axis=-1).tolist(),
+        "bbox": label_bbox.tolist(),
+        "rel": label_relations.tolist()
+      })
+      cur_lbl_id += 1
+
+      processed_data["images"].append({
+        "id": cur_img_id,
+        "file_name": label_img_name,
+        "src": "fu_labeled"
+      })
+      cur_img_id += 1
+      cv2.imwrite(os.path.join(save_img_path, cur_data[0]), label_img)
+      ###### Visualization ######
+      # display_img = display_utils.drawPoints(label_img.copy(), label_j2ds.copy(), point_ratio=10, color_table=color_table)
+
+      # # cv2.imwrite(os.path.join(save_image_path, cur_img_name), cur_img)
+      # bbox_joints = np.array([[label_bbox[0], label_bbox[1]],
+      #                         [label_bbox[0] + label_bbox[2], label_bbox[1]],
+      #                         [label_bbox[0] + label_bbox[2], label_bbox[1] + label_bbox[3]],
+      #                         [label_bbox[0], label_bbox[1] + label_bbox[3]]]).astype(np.int)
       # display_img = display_utils.drawLines(display_img, bbox_joints, np.array([[0, 1], [1, 2], [2, 3], [3, 0]]))
-      # display_img = np.transpose(display_img, [1, 0, 2])
-      bbox = bbox.astype(np.int)
-      # print(bbox)
-      display_img = display_img[bbox[1]:bbox[1]+bbox[3], bbox[0]:bbox[0]+bbox[2]]
-      cv2.imshow("display_img", display_img)
-      cv2.waitKey(30)
+      # cv2.imshow("display_img", display_img)
+      # cv2.waitKey(30)
+
+  with open(save_lbl_path, "w") as f:
+    json.dump(processed_data, f)
