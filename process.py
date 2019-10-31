@@ -1,4 +1,4 @@
-from tracker import Tracker
+from tracker import *
 import display_utils
 import tensorflow as tf
 import numpy as np
@@ -57,7 +57,7 @@ class Interpreter:
 
       self._last_j2ds, self._last_believes = global_j2ds, global_believes
 
-    return self._last_j2ds, self.tracker.GetBoundingBox(), self._last_believes
+    return self._last_j2ds, self.tracker.GetBoundingBox(is_tight=True), self._last_believes
 
 def GetImageLists(img_dir):
   img_list, label_list = [], []
@@ -80,29 +80,59 @@ def GetImageLists(img_dir):
       data_list.append((cur_img, data_list[-1][1]))
   return data_list
 
+def VisualRelation(leg_relations, color_table):
+  if leg_relations[0] == 1:
+    color_table[J13_KNEE_R] = [255, 255, 255]
+  elif leg_relations[0] == 2:
+    color_table[J13_KNEE_R] = [0, 0, 0]
+  
+  if leg_relations[1] == 1:
+    color_table[J13_ANKLE_R] = [255, 255, 255]
+  elif leg_relations[1] == 2:
+    color_table[J13_ANKLE_R] = [0, 0, 0]
+  
+  if leg_relations[2] == 1:
+    color_table[J13_KNEE_L] = [255, 255, 255]
+  elif leg_relations[2] == 2:
+    color_table[J13_KNEE_L] = [0, 0, 0]
+  
+  if leg_relations[3] == 1:
+    color_table[J13_ANKLE_L] = [255, 255, 255]
+  elif leg_relations[3] == 2:
+    color_table[J13_ANKLE_L] = [0, 0, 0]
+
+  return color_table
 if __name__ == "__main__":
   interpreter = Interpreter()
 
-  for v_idx in range(0, 20):
+  for v_idx in range(15, 20):
     data_dir = "E:/DataSets/relation/image/{:02d}".format(v_idx + 1)
     data_list = GetImageLists(data_dir)
 
     for idx, cur_data in enumerate(data_list):
       img = cv2.imread(os.path.join(data_dir, cur_data[0]))
+      print(os.path.join(data_dir, cur_data[0]))
       lbl = json.load(open(os.path.join(data_dir, cur_data[1])))
       leg_relations = np.array([int(lbl["shapes"][0]["label"]),
                                 int(lbl["shapes"][1]["label"]),
                                 int(lbl["shapes"][2]["label"]),
-                                int(lbl["shapes"][3]["label"])]) - 1
-      print(leg_relations)
-      j2ds, bbox, believes = interpreter.Detect(img, idx == 0)
+                                int(lbl["shapes"][3]["label"])]).astype(np.int)
+      leg_relations = np.array([-1, 1, 2, 0])[leg_relations]
 
-      display_img = display_utils.drawPoints(img, j2ds, point_ratio=2)
-      bbox_joints = np.array([[bbox[0], bbox[1]],
-                              [bbox[0] + bbox[2], bbox[1]],
-                              [bbox[0] + bbox[2], bbox[1] + bbox[3]],
-                              [bbox[0], bbox[1] + bbox[3]]])
-      display_img = display_utils.drawLines(display_img, bbox_joints, np.array([[0, 1], [1, 2], [2, 3], [3, 0]]))
-      display_img = np.transpose(display_img, [1, 0, 2])
+      j2ds, bbox, believes = interpreter.Detect(img, idx == 0)
+      color_table = (np.ones([13, 3]) * 128).astype(np.uint8)
+
+      color_table = VisualRelation(leg_relations, color_table)
+      
+      display_img = display_utils.drawPoints(img, j2ds, point_ratio=10, color_table=color_table)
+      # bbox_joints = np.array([[bbox[0], bbox[1]],
+      #                         [bbox[0] + bbox[2], bbox[1]],
+      #                         [bbox[0] + bbox[2], bbox[1] + bbox[3]],
+      #                         [bbox[0], bbox[1] + bbox[3]]]).astype(np.int)
+      # display_img = display_utils.drawLines(display_img, bbox_joints, np.array([[0, 1], [1, 2], [2, 3], [3, 0]]))
+      # display_img = np.transpose(display_img, [1, 0, 2])
+      bbox = bbox.astype(np.int)
+      # print(bbox)
+      display_img = display_img[bbox[1]:bbox[1]+bbox[3], bbox[0]:bbox[0]+bbox[2]]
       cv2.imshow("display_img", display_img)
       cv2.waitKey(30)

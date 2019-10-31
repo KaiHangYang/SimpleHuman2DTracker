@@ -115,8 +115,11 @@ class Tracker(object):
         self.global_offset = np.array([0, 0])
         self.bounding_box = copy.deepcopy(self.default_bounding_box)
 
-    def GetBoundingBox(self):
-        extra_scale = 1.32
+    def GetBoundingBox(self, is_tight=False):
+        if is_tight:
+            extra_scale = 1.0
+        else:
+            extra_scale = 1.32
 
         if self.bounding_box["w"] / self.bounding_box["h"] > self.output_width / self.output_height:
             box_w = self.bounding_box["w"] * extra_scale
