@@ -2,6 +2,7 @@ import numpy as np
 import sys
 import os
 import cv2
+import copy
 
 J13_HIP_R = 0
 J13_KNEE_R = 1
@@ -35,17 +36,26 @@ class Tracker(object):
         self.global_scale = 1.0
         self.global_offset = np.array([0, 0])
 
-        self.bounding_box = {
-            "x": 0,
-            "y": 0,
-            "w": self.input_width,
-            "h": self.input_height
+        initial_width = self.input_width * 0.3
+        initial_height = initial_width / self.output_width * self.output_height
+        initial_cen_x = self.input_width * 0.5
+        initial_cen_y = self.input_height * 0.4
+        self.default_bounding_box = {
+            "x": initial_cen_x - initial_width * 0.5,
+            "y": initial_cen_y - initial_height * 0.5,
+            "w": initial_width,
+            "h": initial_height
         }
+        self.bounding_box = copy.deepcopy(self.default_bounding_box)
 
         self.detecting_frame_cnt = 0
         self.tracking_faliure_frame_cnt = 0
 
         self.state = TRACKER_EMPTY
+
+    def Reset(self):
+        self.SetState(TRACKER_EMPTY)
+        self.ResetBoundingBox()
 
     def SetState(self, state):
         self.state = state
@@ -103,12 +113,7 @@ class Tracker(object):
     def ResetBoundingBox(self):
         self.global_scale = 1.0
         self.global_offset = np.array([0, 0])
-        self.bounding_box = {
-            "x": 0,
-            "y": 0,
-            "w": self.input_width,
-            "h": self.input_height
-        }
+        self.bounding_box = copy.deepcopy(self.default_bounding_box)
 
     def GetBoundingBox(self):
         extra_scale = 1.32
@@ -126,7 +131,6 @@ class Tracker(object):
 
     def Track(self, frame, joints=None, belief=None):
         
-
         if joints is None or belief is None:
             self.SetState(TRACKER_EMPTY)
             self.ResetBoundingBox()

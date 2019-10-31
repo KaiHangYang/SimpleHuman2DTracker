@@ -16,8 +16,14 @@ class Interpreter:
     self.input_details = self.interpreter.get_input_details()
     self.output_details = self.interpreter.get_output_details()
     self.interpreter.allocate_tensors()
+    
+    self.tracker = Tracker(input_width=1080,
+                      input_height=1920,
+                      output_width=192,
+                      output_height=256,
+                      blf_threshold=0.0)
 
-  def Inference(self, img):
+  def _Inference(self, img):
     img = np.copy(img[np.newaxis])
     self.interpreter.set_tensor(self.input_details[0]["index"], img.astype(self.input_details[0]["dtype"]))
     self.interpreter.set_tensor(self.input_details[1]["index"], self.pre_coord.astype(self.input_details[1]["dtype"]))
@@ -30,24 +36,30 @@ class Interpreter:
 
     return joints_2d, believes
 
-if __name__ == "__main__":
-    tracker = Tracker(input_width=1080,
-                      input_height=1920,
-                      output_width=192,
-                      output_height=256,
-                      blf_threshold=0.1)
-    raw_img = cv2.imread("E:/DataSets/relation/image/01/010001.jpg")
-    inter = Interpreter()
-    output_j2ds = None
-    output_believes = None
-    while True:
-      display_img = raw_img.copy()
-      img = tracker.Track(raw_img, output_j2ds, output_believes)
-      cv2.imshow("img", img)
-      cv2.waitKey()
-      output_j2ds, output_believes = inter.Inference(img)
+  def Detect(self, img):
+    raw_img = img.copy()
+    self.tracker.Reset();
+    last_j2ds = None
+    last_believes = None
+    for _ in range(10):
+      cropped_img = self.tracker.Track(raw_img, last_j2ds, last_believes)
 
-      global_j2ds = tracker.PutIntoGlobal(output_j2ds)
-      display_img = display_utils.drawPoints(display_img, global_j2ds, point_ratio=10)
-      cv2.imshow("display_img", display_img)
-      cv2.waitKey()
+      output_j2ds, output_believes = self._Inference(cropped_img)
+      global_believes = output_believes / 255.0
+      global_j2ds = self.tracker.PutIntoGlobal(output_j2ds)
+
+      last_j2ds, last_believes = global_j2ds, global_believes
+
+    return last_j2ds, self.tracker.GetBoundingBox(), last_believes
+
+if __name__ == "__main__":
+  interpreter = Interpreter()
+  img = cv2.imread("E:/DataSets/relation/image/07/070001.jpg")
+
+  for v_idx in range(0, 20):
+    img = cv2.imread("E:/DataSets/relation/image/{:02d}/{:02d}{:04d}.jpg".format(v_idx + 1, v_idx + 1, 1))
+    j2ds, bbox, believes = interpreter.Detect(img)
+
+    display_img = display_utils.drawPoints(img, j2ds, point_ratio=2)
+    cv2.imshow("display_img", display_img)
+    cv2.waitKey()
