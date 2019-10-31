@@ -161,7 +161,6 @@ class Tracker(object):
                         self.ResetBoundingBox()
                     else:
                         self.tracking_faliure_frame_cnt += 1
-        print(self.state)
         cur_bounding_box = self.GetBoundingBox()
 
         self.global_offset = np.array(
